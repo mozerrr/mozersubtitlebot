@@ -6,19 +6,28 @@ import 'package:teledart/telegram.dart';
 import 'package:teledart/model.dart' as TG;
 
 main() {
- final String token = '1219961163:AAG7SlVIaMiSTY9F5SU_KTB_0T6bcOB2VGo';
+ //final String token = '1219961163:AAG7SlVIaMiSTY9F5SU_KTB_0T6bcOB2VGo';
+  String token = '638343814:AAGzB3rHet3lguBVE_wW3Fe5mWoEndZduF8'; // reserve
 
  TeleDart teledart = TeleDart(Telegram(token), Event());
  Dio dio = Dio();
  teledart.start().then((me) => print('${me.username} is initialised'));
+  teledart.telegram.setMyCommands(
+      [TG.BotCommand(command: 'help', description: 'Подсказка как конвертировать субтитры')]
+  );
 
- //TODO добавить интерфейс
- //TODO поддержка utf8
+  teledart
+      .onCommand('help')
+      .listen(((message) => teledart.replyMessage(message,
+        'convert {fps файла} {fps необходимый}\n|convert {fps файла} | - 23.976 - по умолчанию')));
+
+ //TODO поддержка utf8 [???] вроде работает
  //TODO других форматов субтитров
  teledart
    .onMessage(keyword: 'convert')
    .listen((message) async {
      if (message.document != null) {
+
        String fileName = message.document.file_name;
        //await teledart.telegram.deleteMessage(message.chat.id, message.message_id);
        print('save');
