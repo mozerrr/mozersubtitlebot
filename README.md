@@ -1,4 +1,4 @@
-# discord_test
+# mozer subtitle bot
 
 A new Flutter application.
 

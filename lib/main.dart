@@ -6,66 +6,66 @@ import 'package:teledart/telegram.dart';
 import 'package:teledart/model.dart' as TG;
 
 main() {
- //final String token = '1219961163:AAG7SlVIaMiSTY9F5SU_KTB_0T6bcOB2VGo';
-  String token = '638343814:AAGzB3rHet3lguBVE_wW3Fe5mWoEndZduF8'; // reserve
+  Map<String, String> env = Platform.environment;
+  final String token = env['TELEGRAMTOKENMAIN']; //set your token in environment or manually
+  
+  TeleDart teledart = TeleDart(Telegram(token), Event());
+  Dio dio = Dio();
+  teledart.start().then((me) => print('${me.username} is initialised'));
+   teledart.telegram.setMyCommands(
+       [TG.BotCommand(command: 'help', description: 'Подсказка как конвертировать субтитры')]
+   );
 
- TeleDart teledart = TeleDart(Telegram(token), Event());
- Dio dio = Dio();
- teledart.start().then((me) => print('${me.username} is initialised'));
-  teledart.telegram.setMyCommands(
-      [TG.BotCommand(command: 'help', description: 'Подсказка как конвертировать субтитры')]
-  );
-
-  teledart
-      .onCommand('help')
-      .listen(((message) => teledart.replyMessage(message,
+   teledart
+       .onCommand('help')
+       .listen(((message) => teledart.replyMessage(message,
         'convert {fps файла} {fps необходимый}\n|convert {fps файла} | - 23.976 - по умолчанию')));
 
- //TODO поддержка utf8 [???] вроде работает
- //TODO других форматов субтитров
- teledart
-   .onMessage(keyword: 'convert')
-   .listen((message) async {
-     if (message.document != null) {
+  //TODO поддержка utf8 [???] вроде работает
+  //TODO других форматов субтитров
+  teledart
+    .onMessage(keyword: 'convert')
+    .listen((message) async {
+      if (message.document != null) {
 
-       String fileName = message.document.file_name;
-       //await teledart.telegram.deleteMessage(message.chat.id, message.message_id);
-       print('save');
-       String fileID = message.document.file_id;
-       //bool wasError = false;
-       try {
-         final TG.File tempSub = await teledart.telegram.getFile(fileID);
-         await dio.download(
-             "https://api.telegram.org/file/bot$token/${tempSub.file_path}",
-             './download/$fileName',
-             options: Options(responseType: ResponseType.plain)
-         );
-         File sub = await File('./download/$fileName');
-         await sub.rename('./download/Fixed $fileName');
-         sub = await File('./download/Fixed $fileName');
-         String contents = await sub.readAsString(encoding: Encoding.getByName('latin1'));
-         String fixedString = Sub.parseSubtitle(contents, Command.parse(message.caption));
-         await sub.writeAsString(fixedString, encoding: Encoding.getByName('latin1'));
-         await teledart.telegram.sendDocument(message.chat.id, sub);
-       }
-       on LengthException catch (e) {
-         await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
-       }
-       on NotDoubleException catch (e) {
-         await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
-       }
-       catch (e) {
-         //wasError = true;
-         await teledart.telegram.sendMessage(message.chat.id, 'Упс. Что-то пошло не так.');
-       }
-     }
-     else {
-       await teledart.telegram.sendMessage(message.chat.id,
-           'Упс. Что-то пошло не так. Возможно не прикреплены субтитры.'
-       );
-     }
-   }
- );
+        String fileName = message.document.file_name;
+        //await teledart.telegram.deleteMessage(message.chat.id, message.message_id);
+        print('save');
+        String fileID = message.document.file_id;
+        //bool wasError = false;
+        try {
+          final TG.File tempSub = await teledart.telegram.getFile(fileID);
+          await dio.download(
+              "https://api.telegram.org/file/bot$token/${tempSub.file_path}",
+              './download/$fileName',
+              options: Options(responseType: ResponseType.plain)
+          );
+          File sub = await File('./download/$fileName');
+          await sub.rename('./download/Fixed $fileName');
+          sub = await File('./download/Fixed $fileName');
+          String contents = await sub.readAsString(encoding: Encoding.getByName('latin1'));
+          String fixedString = Sub.parseSubtitle(contents, Command.parse(message.caption));
+          await sub.writeAsString(fixedString, encoding: Encoding.getByName('latin1'));
+          await teledart.telegram.sendDocument(message.chat.id, sub);
+        }
+        on LengthException catch (e) {
+          await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
+        }
+        on NotDoubleException catch (e) {
+          await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
+        }
+        catch (e) {
+          //wasError = true;
+          await teledart.telegram.sendMessage(message.chat.id, 'Упс. Что-то пошло не так.');
+        }
+      }
+      else {
+        await teledart.telegram.sendMessage(message.chat.id,
+            'Упс. Что-то пошло не так. Возможно не прикреплены субтитры.'
+        );
+      }
+    }
+  );
 }
 
 class Command {
