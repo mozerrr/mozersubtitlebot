@@ -1,90 +1,91 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:teledart/model.dart' as TG;
 import 'package:teledart/teledart.dart';
 import 'package:teledart/telegram.dart';
-import 'package:teledart/model.dart' as TG;
 
-main() {
+void main() async {
   Map<String, String> env = Platform.environment;
-  final String token = env['TELEGRAMTOKENMAIN']; //set your token in environment or manually
-  
+  final String token =
+      env['TELEGRAMTOKENMAIN']; //set your token in environment or manually
+
   TeleDart teledart = TeleDart(Telegram(token), Event());
   Dio dio = Dio();
   teledart.start().then((me) => print('${me.username} is initialised'));
-   teledart.telegram.setMyCommands(
-       [TG.BotCommand(command: 'help', description: 'Подсказка как конвертировать субтитры')]
-   );
+  teledart.telegram.setMyCommands([
+    TG.BotCommand(
+        command: 'help', description: 'Подсказка как конвертировать субтитры'),
+    TG.BotCommand(command: 'convert', description: 'Конвертация')
+  ]);
 
-   teledart
-       .onCommand('help')
-       .listen(((message) => teledart.replyMessage(message,
-        'convert {fps файла} {fps необходимый}\n|convert {fps файла} | - 23.976 - по умолчанию')));
+  teledart.onCommand('help').listen(((message) => teledart.replyMessage(message,
+      'convert {fps файла} {fps необходимый}\n|convert {fps файла} | - 23.976 - по умолчанию')));
+
+  teledart.onCommand('convert').listen(((message) => teledart.replyMessage(
+      message,
+      'convert {fps файла} {fps необходимый}\n|convert {fps файла} | - 23.976 - по умолчанию')));
 
   //TODO поддержка utf8 [???] вроде работает
   //TODO других форматов субтитров
-  teledart
-    .onMessage(keyword: 'convert')
-    .listen((message) async {
-      if (message.document != null) {
-
-        String fileName = message.document.file_name;
-        //await teledart.telegram.deleteMessage(message.chat.id, message.message_id);
-        print('save');
-        String fileID = message.document.file_id;
-        //bool wasError = false;
-        try {
-          final TG.File tempSub = await teledart.telegram.getFile(fileID);
-          await dio.download(
-              "https://api.telegram.org/file/bot$token/${tempSub.file_path}",
-              './download/$fileName',
-              options: Options(responseType: ResponseType.plain)
-          );
-          File sub = await File('./download/$fileName');
-          await sub.rename('./download/Fixed $fileName');
-          sub = await File('./download/Fixed $fileName');
-          String contents = await sub.readAsString(encoding: Encoding.getByName('latin1'));
-          String fixedString = Sub.parseSubtitle(contents, Command.parse(message.caption));
-          await sub.writeAsString(fixedString, encoding: Encoding.getByName('latin1'));
-          await teledart.telegram.sendDocument(message.chat.id, sub);
-        }
-        on LengthException catch (e) {
-          await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
-        }
-        on NotDoubleException catch (e) {
-          await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
-        }
-        catch (e) {
-          //wasError = true;
-          await teledart.telegram.sendMessage(message.chat.id, 'Упс. Что-то пошло не так.');
-        }
+  teledart.onMessage(keyword: 'convert').listen((message) async {
+    if (message.document != null) {
+      String fileName = message.document.file_name;
+      //await teledart.telegram.deleteMessage(message.chat.id, message.message_id);
+      print('save');
+      String fileID = message.document.file_id;
+      //bool wasError = false;
+      try {
+        final TG.File tempSub = await teledart.telegram.getFile(fileID);
+        await dio.download(
+            "https://api.telegram.org/file/bot$token/${tempSub.file_path}",
+            './download/$fileName',
+            options: Options(responseType: ResponseType.plain));
+        File sub = await File('./download/$fileName');
+        await sub.rename('./download/Fixed $fileName');
+        sub = await File('./download/Fixed $fileName');
+        String contents =
+            await sub.readAsString(encoding: Encoding.getByName('latin1'));
+        String fixedString =
+            Sub.parseSubtitle(contents, Command.parse(message.caption));
+        await sub.writeAsString(fixedString,
+            encoding: Encoding.getByName('latin1'));
+        await teledart.telegram.sendDocument(message.chat.id, sub);
+      } on LengthException catch (e) {
+        await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
+      } on NotDoubleException catch (e) {
+        await teledart.telegram.sendMessage(message.chat.id, e.errorMessage());
+      } catch (e) {
+        await teledart.telegram
+            .sendMessage(message.chat.id, 'Упс. Что-то пошло не так.');
       }
-      else {
-        await teledart.telegram.sendMessage(message.chat.id,
-            'Упс. Что-то пошло не так. Возможно не прикреплены субтитры.'
-        );
+      final directory = Directory('./download');
+      final files = directory.listSync();
+      for (final file in files) {
+        file.deleteSync();
       }
+    } else {
+      await teledart.telegram.sendMessage(message.chat.id,
+          'Упс. Что-то пошло не так. Возможно не прикреплены субтитры.');
     }
-  );
+  });
 }
 
 class Command {
   double originalFPS;
   double targetFPS;
 
-  Command(double original, double target)
-  {
+  Command(double original, double target) {
     originalFPS = original;
     targetFPS = target;
   }
 
   static Command parse(String commandString) {
     var temp = commandString.split(' ');
-    //print(temp);
     if (temp.length == 2) {
       temp.add('23.976');
-    }
-    else if (temp.length != 3) {
+    } else if (temp.length != 3) {
       throw LengthException();
     }
     var original = double.tryParse(temp[1].replaceFirst(',', '.'));
@@ -92,21 +93,20 @@ class Command {
 
     if (original is double && target is double) {
       return Command(original, target);
-    }
-    else throw NotDoubleException();
+    } else
+      throw NotDoubleException();
   }
 }
 
 class Sub {
-
   static String parseSubtitle(String subtitle, Command command) {
     var temp = subtitle.split('\r\n');
     String newFile = '';
     for (String i in temp) {
       if (i.contains(' --> ')) {
-        newFile+= "${parseTimecode(i, _multiply(command))}\r\n";
+        newFile += "${parseTimecode(i, _multiply(command))}\r\n";
       } else {
-        newFile+= '$i\r\n';
+        newFile += '$i\r\n';
       }
     }
     return newFile;
@@ -153,11 +153,9 @@ class Sub {
   static String toCode(String number) {
     if (number.length == 1) {
       return '0$number';
-    }
-    else if (number.length == 2) {
+    } else if (number.length == 2) {
       return number;
-    }
-    else {
+    } else {
       throw Exception();
     }
   }
@@ -181,6 +179,6 @@ class NotDoubleException implements Exception {
 
 class EmptyDocumentException implements Exception {
   String errorMessage() {
-    return 'Ошибка. Приложите документ.';
+    return 'Ошибка. Прикрепите документ.';
   }
 }
